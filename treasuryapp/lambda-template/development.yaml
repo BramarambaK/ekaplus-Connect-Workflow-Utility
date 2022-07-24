@@ -1,0 +1,553 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  lambda deployments
+
+  Sample SAM Template for lambda deployments
+
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+
+Parameters:
+  Stage:
+    Type: String
+    Default: dev  #you would change this for dev/prod
+
+Globals:
+  Function:
+    Timeout: 120
+    Environment:
+      Variables:
+        price_s3_bucket_name: engg-dev
+        NLP_S3_BUCKET: engg-dev
+        ANOMALY_S3_BUCKET: engg-dev
+        STACK_NAME: !Ref AWS::StackName
+        
+Resources:
+  TrainRecommendationForAnUserFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: TrainRecommendationForAnUserFunction
+      Handler: app.train_one
+      Runtime: python3.8
+      Tracing: Active
+      Policies:
+        - AWSLambdaExecute
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaExecute
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+              - lambda:InvokeFunction
+              - lambda:InvokeAsync
+              - lambda:GetFunction
+              - lambda:GetFunctionConfiguration
+              - cloudformation:DescribeStacks
+              - cloudformation:DescribeStackResources
+              - ec2:CreateNetworkInterface
+              - ec2:DescribeNetworkInterfaces
+              - ec2:DeleteNetworkInterface
+              - ec2:AssignPrivateIpAddresses
+              - ec2:UnassignPrivateIpAddresses
+              Resource: '*'
+      Layers:
+        - arn:aws:lambda:ap-south-1:105761683210:layer:recommendationLibs:1
+
+  TrainRecommendationForAllUsersFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: TrainRecommendationForAllUsersFunction
+      Handler: app.train_all
+      Runtime: python3.8
+      Policies:
+        - AWSLambdaVPCAccessExecutionRole
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaExecute
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+              - lambda:InvokeFunction
+              - lambda:InvokeAsync
+              - lambda:GetFunction
+              - lambda:GetFunctionConfiguration
+              - cloudformation:DescribeStacks
+              - cloudformation:DescribeStackResources
+              - ec2:CreateNetworkInterface
+              - ec2:DescribeNetworkInterfaces
+              - ec2:DeleteNetworkInterface
+              - ec2:AssignPrivateIpAddresses
+              - ec2:UnassignPrivateIpAddresses
+              Resource: '*'
+      Events:
+        TrainRecommendationForAnAllUsers:
+          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            Path: /train-recommendation-for-all-users
+            Method: post
+            RestApiId: !Ref LambdaAPIs
+      Layers:
+        - arn:aws:lambda:ap-south-1:105761683210:layer:recommendationLibs:1
+
+  TrainRecommendationFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: TrainRecommendationFunction
+      Handler: app.call_train_all
+      Runtime: python3.8
+      Policies:
+        - AWSLambdaVPCAccessExecutionRole
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaExecute
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+              - lambda:InvokeFunction
+              - lambda:InvokeAsync
+              - lambda:GetFunction
+              - lambda:GetFunctionConfiguration
+              - cloudformation:DescribeStacks
+              - cloudformation:DescribeStackResources
+              - ec2:CreateNetworkInterface
+              - ec2:DescribeNetworkInterfaces
+              - ec2:DeleteNetworkInterface
+              - ec2:AssignPrivateIpAddresses
+              - ec2:UnassignPrivateIpAddresses
+              Resource: '*'
+      Events:
+        TrainRecommendationFunctionEvent:
+          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            Path: /train-recommendation
+            Method: post
+            RestApiId: !Ref LambdaAPIs
+      Layers:
+        - arn:aws:lambda:ap-south-1:105761683210:layer:recommendationLibs:1
+
+
+  TrainNlpFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: TrainNlpFunction
+      Handler: app.train
+      Runtime: python3.7
+      Timeout: 720
+      MemorySize: 1024
+      Events:
+        TrainNlp:
+          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            Path: /train-nlp
+            Method: post
+            RestApiId: !Ref LambdaAPIs
+      Policies:
+        - AWSLambdaVPCAccessExecutionRole
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaExecute
+        - Version: '2012-10-17' 
+          Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:GetObjectACL
+                - s3:PutObject
+                - s3:ListBucket
+                - ec2:CreateNetworkInterface
+                - ec2:DescribeNetworkInterfaces
+                - ec2:DeleteNetworkInterface
+                - ec2:AssignPrivateIpAddresses
+                - ec2:UnassignPrivateIpAddresses
+              Resource: '*'
+      Layers:
+        - arn:aws:lambda:ap-south-1:105761683210:layer:nlpLibs:1
+            
+  ProcessSentenceFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: ProcessSentenceFunction
+      Handler: app.process_sentence
+      Runtime: python3.7
+      MemorySize: 512
+      Events:
+        TrainNlp:
+          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            Path: /process-sentence
+            Method: post
+            RestApiId: !Ref LambdaAPIs
+
+      Policies:
+        - AWSLambdaExecute
+        - AWSLambdaVPCAccessExecutionRole
+        - AWSLambdaBasicExecutionRole
+        - Version: '2012-10-17' 
+          Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:GetObjectACL
+                - s3:PutObject
+                - s3:ListBucket
+                - ec2:CreateNetworkInterface
+                - ec2:DescribeNetworkInterfaces
+                - ec2:DeleteNetworkInterface
+                - ec2:AssignPrivateIpAddresses
+                - ec2:UnassignPrivateIpAddresses
+              Resource: '*'
+      Layers:
+        - arn:aws:lambda:ap-south-1:105761683210:layer:nlpLibs:1
+
+  ResetTrainingFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: ResetTrainingFunction
+      Handler: app.reset
+      Runtime: python3.7
+      Events:
+        TrainNlp:
+          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            Path: /reset
+            Method: post
+            RestApiId: !Ref LambdaAPIs
+
+      Policies:
+        - AWSLambdaVPCAccessExecutionRole
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaExecute
+        - Version: '2012-10-17' 
+          Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:GetObjectACL
+                - s3:PutObject
+                - s3:ListBucket
+                - ec2:CreateNetworkInterface
+                - ec2:DescribeNetworkInterfaces
+                - ec2:DeleteNetworkInterface
+                - ec2:AssignPrivateIpAddresses
+                - ec2:UnassignPrivateIpAddresses
+              Resource: '*'
+      Layers:
+        - arn:aws:lambda:ap-south-1:105761683210:layer:nlpLibs:1
+
+  TagTextFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: TagTextFunction
+      Handler: app.lambda_handler
+      Runtime: python3.7
+      MemorySize: 512
+      Events:
+        HelloWorld:
+          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            Path: /process-sentence-v2
+            Method: post
+            RestApiId: !Ref LambdaAPIs
+      Policies:
+        - AWSLambdaVPCAccessExecutionRole
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaExecute
+        - Version: '2012-10-17' 
+          Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:GetObjectACL
+                - s3:PutObject
+                - s3:ListBucket
+                - lambda:InvokeFunction
+                - lambda:InvokeAsync
+                - lambda:GetFunction
+                - lambda:GetFunctionConfiguration
+                - cloudformation:DescribeStacks
+                - cloudformation:DescribeStackResources
+                - ec2:CreateNetworkInterface
+                - ec2:DescribeNetworkInterfaces
+                - ec2:DeleteNetworkInterface
+                - ec2:AssignPrivateIpAddresses
+                - ec2:UnassignPrivateIpAddresses
+              Resource: '*'
+      Layers:
+        - arn:aws:lambda:ap-south-1:105761683210:layer:nlpLibs:1
+
+
+  DeliveryItemPriceFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: DeliveryItemPriceFunction
+      Handler: deliveryitem-price.lambda_handler
+      Runtime: python3.8
+      Events:
+        DeliveryItemPriceAPI:
+          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            Path: /deliveryitem-price
+            Method: post
+            RestApiId: !Ref LambdaAPIs
+
+      Policies:
+        - AWSLambdaVPCAccessExecutionRole
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaExecute
+        - Version: '2012-10-17' 
+          Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:GetObjectACL
+                - s3:PutObject
+                - s3:ListBucket
+                - ec2:CreateNetworkInterface
+                - ec2:DescribeNetworkInterfaces
+                - ec2:DeleteNetworkInterface
+                - ec2:AssignPrivateIpAddresses
+                - ec2:UnassignPrivateIpAddresses
+              Resource: '*'
+      Layers:
+        - arn:aws:lambda:ap-south-1:105761683210:layer:powerLibs:1
+                
+  DeliveryItemValuationFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: DeliveryItemValuationFunction
+      Handler: deliveryitem-valuation.lambda_handler
+      Runtime: python3.8
+      Events:
+        DeliveryItemPriceAPI:
+          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            Path: /deliveryitem-valuation
+            Method: post
+            RestApiId: !Ref LambdaAPIs
+
+      Policies:
+        - AWSLambdaVPCAccessExecutionRole
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaExecute
+        - Version: '2012-10-17' 
+          Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:GetObjectACL
+                - s3:PutObject
+                - s3:ListBucket
+                - ec2:CreateNetworkInterface
+                - ec2:DescribeNetworkInterfaces
+                - ec2:DeleteNetworkInterface
+                - ec2:AssignPrivateIpAddresses
+                - ec2:UnassignPrivateIpAddresses
+              Resource: '*'
+      Layers:
+        - arn:aws:lambda:ap-south-1:105761683210:layer:powerLibs:1
+
+  GetMarketPriceFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: GetMarketPriceFunction
+      Handler: get_market_price.lambda_handler
+      Runtime: python3.8
+      Events:
+        DeliveryItemPriceAPI:
+          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            Path: /get_market_price
+            Method: post
+            RestApiId: !Ref LambdaAPIs
+
+      Policies:
+        - AWSLambdaVPCAccessExecutionRole
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaExecute
+        - Version: '2012-10-17' 
+          Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:GetObjectACL
+                - s3:PutObject
+                - s3:ListBucket'
+                - ec2:CreateNetworkInterface
+                - ec2:DescribeNetworkInterfaces
+                - ec2:DeleteNetworkInterface
+                - ec2:AssignPrivateIpAddresses
+                - ec2:UnassignPrivateIpAddresses
+              Resource: '*'
+      Layers:
+        - arn:aws:lambda:ap-south-1:105761683210:layer:powerLibs:1
+
+  PricingLambdaFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: PricingLambdaFunction
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.8
+      Policies:
+        - AWSLambdaVPCAccessExecutionRole
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaExecute
+        - Version: '2012-10-17' 
+          Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:GetObjectACL
+                - s3:PutObject
+                - s3:ListBucket
+                - ec2:CreateNetworkInterface
+                - ec2:DescribeNetworkInterfaces
+                - ec2:DeleteNetworkInterface
+                - ec2:AssignPrivateIpAddresses
+                - ec2:UnassignPrivateIpAddresses
+              Resource: '*'
+      Layers:
+        - arn:aws:lambda:ap-south-1:105761683210:layer:pricingLibs:1
+
+  TrainAnomalyDetectionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: TrainAnomalyDetectionFunction
+      Handler: app.train_anomaly_
+      Runtime: python3.8
+      Events:
+        Train:
+          Type: Api
+          Properties:
+            Path: /train-anomaly-detection-model
+            Method: post
+            RestApiId:
+              Ref: LambdaAPIs
+      Policies:
+        - AWSLambdaVPCAccessExecutionRole
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaExecute
+        - Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:GetObjectACL
+              - s3:PutObject
+              - s3:ListBucket
+              - ec2:CreateNetworkInterface
+              - ec2:DescribeNetworkInterfaces
+              - ec2:DeleteNetworkInterface
+              - ec2:AssignPrivateIpAddresses
+              - ec2:UnassignPrivateIpAddresses
+            Resource: '*'
+      Layers:
+        - arn:aws:lambda:ap-south-1:105761683210:layer:anomalyLibs:1
+
+  CheckAnomalyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: CheckAnomalyFunction
+      Handler: app.check_anomaly_
+      Runtime: python3.8
+      Events:
+        Check:
+          Type: Api
+          Properties:
+            Path: /check-anomaly
+            Method: post
+            RestApiId:
+              Ref: LambdaAPIs
+      Policies:
+        - AWSLambdaVPCAccessExecutionRole
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaExecute
+        - Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:GetObjectACL
+              - s3:PutObject
+              - s3:ListBucket
+              - ec2:CreateNetworkInterface
+              - ec2:DescribeNetworkInterfaces
+              - ec2:DeleteNetworkInterface
+              - ec2:AssignPrivateIpAddresses
+              - ec2:UnassignPrivateIpAddresses
+            Resource: '*' 
+
+      Layers:
+        - arn:aws:lambda:ap-south-1:105761683210:layer:anomalyLibs:1
+
+  UserActivityAnalysis:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: UserActivityAnalysis
+      Handler: app.lambda_handler
+      Runtime: python3.8
+      Events:
+        HelloWorld:
+          Type: Api
+          Properties:
+            Path: /train-user-activity
+            Method: post
+            RestApiId:
+              Ref: LambdaAPIs
+      Policies:
+        - AWSLambdaVPCAccessExecutionRole
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaExecute
+        - Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+              - ec2:CreateNetworkInterface
+              - ec2:DescribeNetworkInterfaces
+              - ec2:DeleteNetworkInterface
+              - ec2:AssignPrivateIpAddresses
+              - ec2:UnassignPrivateIpAddresses
+            Resource: '*' 
+      Layers:
+        - arn:aws:lambda:ap-south-1:105761683210:layer:userActivityLibs:1
+
+  TreasuryPreProcessing:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: TreasuryPreProcessing
+      Handler: app.pre_processing_adapter
+      Runtime: python3.8
+      Timeout: 720
+      Events:
+        TreasuryAPI:
+          Type: Api
+          Properties:
+            Path: /treasury_preprocessing
+            Method: post
+            RestApiId:
+              Ref: LambdaAPIs
+      Policies:
+        - AWSLambdaVPCAccessExecutionRole
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaExecute
+        - Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+              - ec2:CreateNetworkInterface
+              - ec2:DescribeNetworkInterfaces
+              - ec2:DeleteNetworkInterface
+              - ec2:AssignPrivateIpAddresses
+              - ec2:UnassignPrivateIpAddresses
+              - lambda:InvokeFunction
+              - lambda:InvokeAsync
+              - lambda:GetFunction
+              - lambda:GetFunctionConfiguration
+              - cloudformation:DescribeStacks
+              - cloudformation:DescribeStackResources
+            Resource: '*' 
+      Layers:
+        - arn:aws:lambda:ap-south-1:105761683210:layer:treasuryLibs:1
+
+  LambdaAPIs:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: engg-dev

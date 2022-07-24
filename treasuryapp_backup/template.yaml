@@ -1,0 +1,54 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'treasury
+
+  Sample SAM Template for treasury
+
+  '
+Globals:
+  Function:
+    Timeout: 500
+Resources:
+  TreasuryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: TreasuryFunction
+      Handler: app.lambda_handler
+      Runtime: python3.8
+      Policies:
+        Statement:
+        - Effect: Allow
+          Action:
+          - lambda:InvokeFunction
+          - lambda:InvokeAsync
+          - lambda:GetFunction
+          - lambda:GetFunctionConfiguration
+          - cloudformation:DescribeStacks
+          - cloudformation:DescribeStackResources
+          Resource: '*'
+      Events:
+        TreasuryAPI:
+          Type: Api
+          Properties:
+            Path: /treasury_mapping
+            Method: post
+            RestApiId:
+              Ref: TreasuryAPI
+  TreasuryPreProcessing:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: TreasuryPreProcessing
+      Handler: app.pre_processing_adapter
+      Runtime: python3.8
+      Events:
+        TreasuryAPI:
+          Type: Api
+          Properties:
+            Path: /treasury_preprocessing
+            Method: post
+            RestApiId:
+              Ref: TreasuryAPI
+  TreasuryAPI:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: dev

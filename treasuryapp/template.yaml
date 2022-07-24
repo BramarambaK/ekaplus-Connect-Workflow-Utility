@@ -1,0 +1,27 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'Treasury
+  Sample SAM Template for treasury
+  '
+Globals:
+  Function:
+    Timeout: 500
+Resources:
+  TreasuryPreProcessing:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: code/
+      Handler: app.pre_processing_adapter
+      Runtime: python3.8
+      Events:
+        TreasuryAPI:
+          Type: Api
+          Properties:
+            Path: /treasury_preprocessing
+            Method: post
+            RestApiId:
+              Ref: TreasuryAPI
+  TreasuryAPI:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: dev
